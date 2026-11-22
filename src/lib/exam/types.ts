@@ -5,6 +5,9 @@ export type QuestionTypeSetting = QuestionType | "mixed";
 export type Difficulty = "easy" | "medium" | "hard";
 
 export const QUESTION_COUNTS = [5, 10, 15] as const;
+/** Süreli sınav seçenekleri (dakika); 0 = süresiz */
+export const TIME_LIMIT_OPTIONS = [0, 15, 30, 45, 60, 90] as const;
+export const MAX_TIME_LIMIT_MINUTES = 240;
 export const MIN_QUESTIONS = 1;
 export const MAX_QUESTIONS = 20;
 export const MC_LETTERS = ["A", "B", "C", "D"] as const;
@@ -24,6 +27,8 @@ export interface ExamSettings {
   materialNames?: string[];
   /** Tekrar sınavında odaklanılan konular */
   focusTopics?: string[];
+  /** Süreli sınav: dakika cinsinden süre (yok/0 = süresiz) */
+  timeLimitMinutes?: number | null;
   /** Sınavı üreten Gemini modeli (bilgi amaçlı) */
   model?: string;
   /**
@@ -107,6 +112,8 @@ interface ExamViewBase {
   course: { id: string; title: string };
   settings: ExamSettings | null;
   created_at: string;
+  /** Sınavın ilk açıldığı an (süre sayacı buradan başlar) */
+  started_at: string | null;
 }
 
 export interface InProgressExamView extends ExamViewBase {
@@ -123,6 +130,10 @@ export interface CompletedExamView extends ExamViewBase {
   feedback_summary: string;
   submitted_at: string | null;
   study_guide: StudyGuide | null;
+  /** Soru id'si → sınav başından itibaren o soruya son dokunuş (ms) */
+  timing: Record<string, number> | null;
+  /** "Bu soru hatalı" işaretlenen soru id'leri (puana ve konu analizine dahil edilmez) */
+  flagged: number[];
 }
 
 export type ExamView = InProgressExamView | CompletedExamView;

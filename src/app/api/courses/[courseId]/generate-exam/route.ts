@@ -7,6 +7,7 @@ import { loadCourseSources, noSourcesMessage, parseMaterialIds } from "@/lib/cou
 import { SIMILARITY_PREFIX } from "@/lib/exam/similarity";
 import {
   MAX_QUESTIONS,
+  MAX_TIME_LIMIT_MINUTES,
   MIN_QUESTIONS,
   type Difficulty,
   type ExamMode,
@@ -93,5 +94,9 @@ function parseSettings(body: Record<string, unknown>): ExamSettings | string {
   if (!TYPES.includes(questionType)) return "Soru tipi 'multiple_choice', 'open_ended' ya da 'mixed' olmalı.";
   const mode = (body.mode ?? "normal") as ExamMode;
   if (mode !== "normal" && mode !== "review") return "Mod 'normal' ya da 'review' olmalı.";
-  return { questionCount, difficulty, questionType, mode };
+  const limit = body.timeLimitMinutes === undefined || body.timeLimitMinutes === null ? 0 : Number(body.timeLimitMinutes);
+  if (!Number.isInteger(limit) || limit < 0 || limit > MAX_TIME_LIMIT_MINUTES) {
+    return `Süre 0-${MAX_TIME_LIMIT_MINUTES} dakika arasında bir tam sayı olmalı (0 = süresiz).`;
+  }
+  return { questionCount, difficulty, questionType, mode, timeLimitMinutes: limit || null };
 }

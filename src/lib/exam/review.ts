@@ -5,6 +5,8 @@ export interface ExamResultRow {
   created_at: string;
   questions_json: ExamQuestion[] | null;
   user_answers_json: GradedAnswer[] | null;
+  /** "Hatalı" işaretlenen sorular tekrar sınavına alınmaz */
+  flagged_json?: number[] | null;
 }
 
 export interface MissedQuestion {
@@ -30,7 +32,9 @@ export function collectMissed(exams: ExamResultRow[]): MissedQuestion[] {
   for (const exam of sorted) {
     if (!Array.isArray(exam.user_answers_json) || !Array.isArray(exam.questions_json)) continue;
     const byId = new Map(exam.questions_json.map((q) => [q.id, q]));
+    const flagged = new Set(exam.flagged_json ?? []);
     for (const g of exam.user_answers_json) {
+      if (flagged.has(g.question_id)) continue;
       const q = byId.get(g.question_id);
       if (q && !g.is_correct) out.push({ question: q, graded: g, examDate: exam.created_at });
     }

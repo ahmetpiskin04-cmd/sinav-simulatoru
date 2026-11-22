@@ -20,6 +20,7 @@ export function ExamScreen({ initial }: { initial: ExamView }) {
     `${view.questions.length} soru`,
     view.settings ? DIFFICULTY_LABELS[view.settings.difficulty] : null,
     view.settings ? QUESTION_TYPE_LABELS[view.settings.questionType] : null,
+    view.settings?.timeLimitMinutes ? `${view.settings.timeLimitMinutes} dk süreli` : null,
   ].filter(Boolean) as string[];
 
   const verification = view.settings?.verification;
@@ -93,7 +94,7 @@ export function ExamScreen({ initial }: { initial: ExamView }) {
       </div>
 
       {view.status === "completed" ? (
-        <ExamResult view={view} />
+        <ExamResult view={view} onChange={setView} />
       ) : isClient ? (
         <ExamRunner view={view} onCompleted={setView} />
       ) : (

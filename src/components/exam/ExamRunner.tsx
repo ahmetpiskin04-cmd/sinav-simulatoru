@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { CircleAlert, LoaderCircle, Send } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { CircleAlert, LoaderCircle, Send, Timer } from "lucide-react";
 import { RichText } from "@/components/exam/RichText";
 import { api } from "@/lib/client-api";
 import { MC_LETTERS, type AnswerMap, type CompletedExamView, type InProgressExamView } from "@/lib/exam/types";
@@ -12,27 +12,74 @@ interface Props {
 }
 
 const draftKey = (examId: string) => `exam-draft:${examId}`;
+const timingKey = (examId: string) => `exam-timing:${examId}`;
 
-function readDraft(examId: string): AnswerMap {
+function readJson<T extends object>(key: string): T {
   try {
-    const raw = localStorage.getItem(draftKey(examId));
+    const raw = localStorage.getItem(key);
     const parsed = raw ? JSON.parse(raw) : null;
-    return parsed && typeof parsed === "object" ? (parsed as AnswerMap) : {};
+    return parsed && typeof parsed === "object" ? (parsed as T) : ({} as T);
   } catch {
-    return {};
+    return {} as T;
   }
+}
+
+/** Soruya son dokunuş anını kaydeder (yalnızca olay işleyicilerinden çağrılır) */
+function recordTouch(timing: Record<string, number>, questionId: number, startedAt: number | null) {
+  if (startedAt) timing[String(questionId)] = Date.now() - startedAt;
+}
+
+/** 754000 → "12:34", 3723000 → "1:02:03" */
+function clock(ms: number) {
+  const t = Math.max(0, Math.ceil(ms / 1000));
+  const h = Math.floor(t / 3600);
+  const m = Math.floor((t % 3600) / 60);
+  const sec = String(t % 60).padStart(2, "0");
+  return h ? `${h}:${String(m).padStart(2, "0")}:${sec}` : `${m}:${sec}`;
 }
 
 export function ExamRunner({ view, onCompleted }: Props) {
   // Yalnızca tarayıcıda çizildiği için (bkz. ExamScreen) localStorage'ı doğrudan okuyabiliriz
-  const [answers, setAnswers] = useState<AnswerMap>(() => readDraft(view.id));
+  const [answers, setAnswers] = useState<AnswerMap>(() => readJson<AnswerMap>(draftKey(view.id)));
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [timeUp, setTimeUp] = useState(false);
+  // Sınavın sunucuda kayıtlı başlangıç anı: yenileme/kapatma sayacı sıfırlamaz
+  const [startedAt, setStartedAt] = useState<number | null>(() => (view.started_at ? Date.parse(view.started_at) : null));
+  const [now, setNow] = useState(() => Date.now());
 
-  // Sayfa yenilense ya da sekme kapansa bile cevaplar kaybolmasın
+  const limitMs = (view.settings?.timeLimitMinutes ?? 0) * 60_000;
+  const deadline = limitMs && startedAt ? startedAt + limitMs : null;
+  const remaining = deadline ? deadline - now : null;
+
+  // Soru id'si → sınav başından itibaren o soruya son dokunuş (ms); soru başına süre buradan çıkar
+  const timing = useRef<Record<string, number>>(readJson<Record<string, number>>(timingKey(view.id)));
+  const answersRef = useRef(answers);
+  const submittingRef = useRef(false);
+
+  // İlk açılışta başlangıç zamanını sunucuya kaydet (zaten varsa aynısı döner)
   useEffect(() => {
+    let cancelled = false;
+    api.startExam(view.id).then(
+      (r) => {
+        if (!cancelled && r.started_at) setStartedAt(Date.parse(r.started_at));
+      },
+      () => {
+        // Kaydedilemezse süreyi bu tarayıcıdaki açılış anından say
+        if (!cancelled) setStartedAt((s) => s ?? Date.now());
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [view.id]);
+
+  // Sayfa yenilense ya da sekme kapansa bile cevaplar ve süreler kaybolmasın
+  useEffect(() => {
+    answersRef.current = answers;
     try {
       localStorage.setItem(draftKey(view.id), JSON.stringify(answers));
+      localStorage.setItem(timingKey(view.id), JSON.stringify(timing.current));
     } catch {}
   }, [answers, view.id]);
 
@@ -41,26 +88,50 @@ export function ExamRunner({ view, onCompleted }: Props) {
   const hasOpenEnded = view.questions.some((q) => q.type === "open_ended");
 
   function setAnswer(id: number, value: string) {
+    recordTouch(timing.current, id, startedAt);
     setAnswers((prev) => ({ ...prev, [String(id)]: value }));
   }
 
-  async function submit() {
-    const blank = total - answeredCount;
-    if (blank > 0 && !window.confirm(`${blank} soru boş. Yine de sınavı bitirmek istiyor musun?`)) return;
+  /** auto: süre dolduğunda onay sormadan teslim */
+  async function submit(auto = false) {
+    if (submittingRef.current) return;
+    const current = answersRef.current;
+    const blank = view.questions.filter((q) => !(current[String(q.id)] ?? "").trim()).length;
+    if (!auto && blank > 0 && !window.confirm(`${blank} soru boş. Yine de sınavı bitirmek istiyor musun?`)) return;
+    submittingRef.current = true;
     setSubmitting(true);
     setError(null);
     try {
-      const result = await api.submitExam(view.id, answers);
+      const result = await api.submitExam(view.id, current, timing.current);
       try {
         localStorage.removeItem(draftKey(view.id));
+        localStorage.removeItem(timingKey(view.id));
       } catch {}
       window.scrollTo({ top: 0 });
       onCompleted(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Sınav gönderilemedi.");
+      submittingRef.current = false;
       setSubmitting(false);
     }
   }
+  const submitRef = useRef(submit);
+  useEffect(() => {
+    submitRef.current = submit;
+  });
+
+  // Saat: her saniye güncellenir; süreli sınavda süre bitince otomatik teslim edilir
+  useEffect(() => {
+    const t = setInterval(() => {
+      const n = Date.now();
+      setNow(n);
+      if (deadline && n >= deadline && !submittingRef.current) {
+        setTimeUp(true);
+        void submitRef.current(true);
+      }
+    }, 1000);
+    return () => clearInterval(t);
+  }, [deadline]);
 
   return (
     <>
@@ -141,6 +212,12 @@ export function ExamRunner({ view, onCompleted }: Props) {
       {/* Alt çubuk: ilerleme + bitir */}
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-zinc-200 bg-white/90 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/90">
         <div className="mx-auto max-w-3xl px-5 py-3">
+          {timeUp && !error && (
+            <div className="mb-2 flex gap-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
+              <Timer className="mt-0.5 size-4 shrink-0" />
+              <span>Süre doldu; cevapların otomatik olarak teslim ediliyor.</span>
+            </div>
+          )}
           {error && (
             <div className="mb-2 flex gap-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-500/10 dark:text-red-300">
               <CircleAlert className="mt-0.5 size-4 shrink-0" />
@@ -162,9 +239,28 @@ export function ExamRunner({ view, onCompleted }: Props) {
                 />
               </div>
             </div>
+            {startedAt !== null && (
+              <div
+                className={`flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-mono text-sm font-medium tabular-nums ${
+                  remaining === null
+                    ? "text-zinc-500"
+                    : remaining <= 60_000
+                      ? "bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300"
+                      : remaining <= 5 * 60_000
+                        ? "bg-amber-50 text-amber-800 dark:bg-amber-500/10 dark:text-amber-300"
+                        : "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+                }`}
+                title={remaining === null ? "Geçen süre" : "Kalan süre"}
+                role="timer"
+                aria-label={remaining === null ? "Geçen süre" : "Kalan süre"}
+              >
+                <Timer className="size-4" />
+                {remaining === null ? clock(now - startedAt) : clock(remaining)}
+              </div>
+            )}
             <button
               type="button"
-              onClick={submit}
+              onClick={() => submit()}
               disabled={submitting}
               className="flex shrink-0 items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-indigo-500 disabled:opacity-60"
             >

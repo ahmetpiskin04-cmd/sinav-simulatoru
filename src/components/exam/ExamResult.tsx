@@ -1,10 +1,11 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import Link from "next/link";
-import { Bot, CircleCheck, CircleDashed, CircleMinus, CircleX, Lightbulb } from "lucide-react";
+import { Bot, CircleCheck, CircleDashed, CircleMinus, CircleX, Flag, Lightbulb, LoaderCircle, Timer } from "lucide-react";
 import { RichText } from "@/components/exam/RichText";
 import { StudyGuidePanel } from "@/components/exam/StudyGuidePanel";
+import { api, formatDuration } from "@/lib/client-api";
 import { MC_LETTERS, WEAK_TOPIC_THRESHOLD, type CompletedExamView, type ExamQuestion, type GradedAnswer } from "@/lib/exam/types";
 
 /** Puan rengi: ≥70 iyi, 50-69 orta, <50 zayıf */
@@ -14,10 +15,51 @@ function tone(score: number) {
   return { text: "text-red-600 dark:text-red-400", bar: "bg-red-500" };
 }
 
-export function ExamResult({ view }: { view: CompletedExamView }) {
+/**
+ * Soru başına yaklaşık süre: her soruya son dokunuş anları sıralanır, ardışık farklar o soruya yazılır.
+ * Öğrenci soruları sırayla çözmeyebileceği için "yaklaşık" gösterilir.
+ */
+function perQuestionTimes(timing: Record<string, number> | null): Map<number, number> {
+  const out = new Map<number, number>();
+  if (!timing) return out;
+  const touches = Object.entries(timing)
+    .map(([id, ms]) => [Number(id), ms] as const)
+    .sort((a, b) => a[1] - b[1]);
+  let prev = 0;
+  for (const [id, ms] of touches) {
+    out.set(id, ms - prev);
+    prev = ms;
+  }
+  return out;
+}
+
+export function ExamResult({ view, onChange }: { view: CompletedExamView; onChange: (v: CompletedExamView) => void }) {
+  const [flagBusy, setFlagBusy] = useState<number | null>(null);
+  const [flagError, setFlagError] = useState<string | null>(null);
   const gradedById = new Map(view.graded.map((g) => [g.question_id, g]));
-  const correct = view.graded.filter((g) => g.is_correct).length;
+  const flagged = new Set(view.flagged);
+  const counted = view.graded.filter((g) => !flagged.has(g.question_id));
+  const correct = counted.filter((g) => g.is_correct).length;
   const t = tone(view.score);
+
+  const limitMs = (view.settings?.timeLimitMinutes ?? 0) * 60_000;
+  const totalMs =
+    view.started_at && view.submitted_at ? Date.parse(view.submitted_at) - Date.parse(view.started_at) : null;
+  const questionTimes = perQuestionTimes(view.timing);
+
+  async function toggleFlag(questionId: number) {
+    const next = !flagged.has(questionId);
+    if (next && !window.confirm("Bu soru hatalı olarak işaretlensin mi? Puana, konu analizine ve tekrar sınavlarına dahil edilmez. İstersen sonra geri alabilirsin.")) return;
+    setFlagBusy(questionId);
+    setFlagError(null);
+    try {
+      onChange(await api.flagQuestion(view.id, questionId, next));
+    } catch (err) {
+      setFlagError(err instanceof Error ? err.message : "İşaret kaydedilemedi.");
+    } finally {
+      setFlagBusy(null);
+    }
+  }
 
   return (
     <div className="mx-auto max-w-3xl px-5 pt-8 pb-20">
@@ -27,8 +69,22 @@ export function ExamResult({ view }: { view: CompletedExamView }) {
           <p className="text-xs font-medium tracking-wide text-zinc-500 uppercase">Puan</p>
           <p className={`mt-1 text-5xl font-semibold tracking-tight tabular-nums ${t.text}`}>{Math.round(view.score)}</p>
           <p className="mt-1 text-sm text-zinc-500">
-            {view.questions.length} sorudan {correct} doğru
+            {counted.length} sorudan {correct} doğru
           </p>
+          {flagged.size > 0 && (
+            <p className="mt-0.5 text-xs text-amber-700 dark:text-amber-400">{flagged.size} soru hatalı işaretli, sayılmadı</p>
+          )}
+          {totalMs !== null && totalMs >= 0 && (
+            <p
+              className={`mt-2 inline-flex items-center gap-1 text-xs ${limitMs && totalMs >= limitMs ? "text-red-600 dark:text-red-400" : "text-zinc-500"}`}
+              title={limitMs && totalMs >= limitMs ? "Süre doldu, sınav otomatik teslim edildi" : "Sınavda geçen süre"}
+            >
+              <Timer className="size-3.5" />
+              {formatDuration(totalMs)}
+              {limitMs ? ` / ${formatDuration(limitMs)}` : ""}
+              {limitMs && totalMs >= limitMs ? " · süre doldu" : ""}
+            </p>
+          )}
         </div>
 
         <div className="rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
@@ -63,10 +119,23 @@ export function ExamResult({ view }: { view: CompletedExamView }) {
       />
 
       {/* Sorular */}
-      <h2 className="mb-4 text-sm font-semibold text-zinc-700 dark:text-zinc-300">Soru soru inceleme</h2>
+      <h2 className="mb-1 text-sm font-semibold text-zinc-700 dark:text-zinc-300">Soru soru inceleme</h2>
+      <p className="mb-4 text-xs text-zinc-500">
+        Cevap anahtarı yanlış ya da soru hatalıysa &quot;Bu soru hatalı&quot; ile işaretle; puanın yeniden hesaplanır.
+      </p>
+      {flagError && <p className="mb-3 text-sm text-red-600 dark:text-red-400">{flagError}</p>}
       <ol className="space-y-5">
         {view.questions.map((q, i) => (
-          <QuestionReview key={q.id} index={i} question={q} graded={gradedById.get(q.id)} />
+          <QuestionReview
+            key={q.id}
+            index={i}
+            question={q}
+            graded={gradedById.get(q.id)}
+            flagged={flagged.has(q.id)}
+            flagBusy={flagBusy === q.id}
+            onToggleFlag={() => toggleFlag(q.id)}
+            approxMs={questionTimes.get(q.id)}
+          />
         ))}
       </ol>
 
@@ -110,16 +179,46 @@ function StatusBadge({ graded, open }: { graded?: GradedAnswer; open: boolean })
   );
 }
 
-function QuestionReview({ index, question: q, graded }: { index: number; question: ExamQuestion; graded?: GradedAnswer }) {
+function QuestionReview({
+  index,
+  question: q,
+  graded,
+  flagged,
+  flagBusy,
+  onToggleFlag,
+  approxMs,
+}: {
+  index: number;
+  question: ExamQuestion;
+  graded?: GradedAnswer;
+  flagged: boolean;
+  flagBusy: boolean;
+  onToggleFlag: () => void;
+  approxMs?: number;
+}) {
   const open = q.type === "open_ended";
   return (
-    <li className="rounded-2xl border border-zinc-200 bg-white p-5 md:p-6 dark:border-zinc-800 dark:bg-zinc-900">
+    <li
+      className={`rounded-2xl border bg-white p-5 md:p-6 dark:bg-zinc-900 ${
+        flagged ? "border-amber-300 dark:border-amber-500/40" : "border-zinc-200 dark:border-zinc-800"
+      }`}
+    >
+      {flagged && (
+        <p className="mb-3 flex items-center gap-1.5 rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
+          <Flag className="size-3.5" /> Hatalı olarak işaretlendi — puana ve konu analizine dahil değil.
+        </p>
+      )}
       <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
         <span className="font-semibold text-zinc-900 dark:text-zinc-100">Soru {index + 1}</span>
         <span className="rounded-full bg-indigo-50 px-2 py-0.5 font-medium text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300">
           {q.topic}
         </span>
-        <span className="ml-auto">
+        {approxMs !== undefined && (
+          <span className="inline-flex items-center gap-1 text-zinc-500" title="Bu soruya ayırdığın yaklaşık süre">
+            <Timer className="size-3.5" /> ≈ {formatDuration(approxMs)}
+          </span>
+        )}
+        <span className={`ml-auto ${flagged ? "opacity-50" : ""}`}>
           <StatusBadge graded={graded} open={open} />
         </span>
       </div>
@@ -186,6 +285,21 @@ function QuestionReview({ index, question: q, graded }: { index: number; questio
           <Lightbulb className="size-3.5" /> Çözüm
         </p>
         <RichText text={q.explanation} className="text-sm text-zinc-700 dark:text-zinc-300" />
+        <div className="mt-3 flex justify-end">
+          <button
+            type="button"
+            onClick={onToggleFlag}
+            disabled={flagBusy}
+            className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs transition disabled:opacity-60 ${
+              flagged
+                ? "text-amber-700 hover:bg-amber-50 dark:text-amber-300 dark:hover:bg-amber-500/10"
+                : "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+            }`}
+          >
+            {flagBusy ? <LoaderCircle className="size-3.5 animate-spin" /> : <Flag className="size-3.5" />}
+            {flagged ? "İşareti kaldır" : "Bu soru hatalı"}
+          </button>
+        </div>
       </div>
     </li>
   );

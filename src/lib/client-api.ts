@@ -69,20 +69,41 @@ export const api = {
   generateStudyGuide: (examId: string) => request<StudyGuide>(`/api/exams/${examId}/study-guide`, { method: "POST" }),
   generateExam: (
     courseId: string,
-    settings: Pick<ExamSettings, "questionCount" | "difficulty" | "questionType" | "mode"> & { materialIds?: string[] },
+    settings: Pick<ExamSettings, "questionCount" | "difficulty" | "questionType" | "mode" | "timeLimitMinutes"> & {
+      materialIds?: string[];
+    },
   ) =>
     request<{ examId: string; questionCount: number }>(`/api/courses/${courseId}/generate-exam`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(settings),
     }),
-  submitExam: (examId: string, answers: AnswerMap) =>
+  submitExam: (examId: string, answers: AnswerMap, timing: Record<string, number>) =>
     request<CompletedExamView>(`/api/exams/${examId}/submit`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ answers }),
+      body: JSON.stringify({ answers, timing }),
+    }),
+  /** Sınavın başlangıç zamanını kaydeder (ilk çağrıda) ve döndürür */
+  startExam: (examId: string) => request<{ started_at: string | null }>(`/api/exams/${examId}/start`, { method: "POST" }),
+  flagQuestion: (examId: string, questionId: number, flagged: boolean) =>
+    request<CompletedExamView>(`/api/exams/${examId}/flag`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ questionId, flagged }),
     }),
 };
+
+/** 125000 → "2 dk 5 sn" */
+export function formatDuration(ms: number) {
+  const total = Math.max(0, Math.round(ms / 1000));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  if (h) return `${h} sa ${m} dk`;
+  if (m) return s ? `${m} dk ${s} sn` : `${m} dk`;
+  return `${s} sn`;
+}
 
 export const formatDate = (iso: string) =>
   new Date(iso).toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" });

@@ -11,6 +11,7 @@ import {
   DIFFICULTY_LABELS,
   QUESTION_COUNTS,
   QUESTION_TYPE_LABELS,
+  TIME_LIMIT_OPTIONS,
   type Difficulty,
   type ExamMode,
   type QuestionTypeSetting,
@@ -37,6 +38,7 @@ export function NewExamModal({ mode, courseId, courseTitle, materials, review, o
   const [questionCount, setQuestionCount] = useState<number>(isReview ? 5 : 10);
   const [difficulty, setDifficulty] = useState<Difficulty>("medium");
   const [questionType, setQuestionType] = useState<QuestionTypeSetting>("mixed");
+  const [timeLimit, setTimeLimit] = useState<number>(0);
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const busy = startedAt !== null;
@@ -53,6 +55,7 @@ export function NewExamModal({ mode, courseId, courseTitle, materials, review, o
         difficulty,
         questionType,
         mode,
+        timeLimitMinutes: timeLimit,
         // Hepsi seçiliyse göndermeye gerek yok: sunucu tümünü kullanır
         materialIds: isReview || allSelected ? undefined : [...selected],
       });
@@ -134,6 +137,19 @@ export function NewExamModal({ mode, courseId, courseTitle, materials, review, o
                 label: QUESTION_TYPE_LABELS[t],
               }))}
             />
+          </Field>
+          <Field label="Süre">
+            <Segmented
+              value={timeLimit}
+              onChange={setTimeLimit}
+              options={TIME_LIMIT_OPTIONS.map((m) => ({ value: m, label: m ? `${m} dk` : "Süresiz" }))}
+            />
+            {timeLimit > 0 && (
+              <p className="mt-1.5 text-xs text-zinc-500">
+                Soru başına ≈ {Math.round((timeLimit / questionCount) * 10) / 10} dk. Süre sınav ilk açıldığında başlar;
+                sayfayı kapatsan da işler, bitince sınav otomatik teslim edilir.
+              </p>
+            )}
           </Field>
 
           {error && <ErrorNote text={error} />}

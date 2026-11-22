@@ -145,3 +145,21 @@ export function buildFeedbackSummary(score: number, graded: GradedAnswer[], topi
 }
 
 export const weakTopics = (topics: TopicStat[]) => topics.filter((t) => t.score < WEAK_TOPIC_THRESHOLD);
+
+/**
+ * "Bu soru hatalı" işaretlenen sorular hariç puan, konu analizi ve özet.
+ * Hepsi işaretlendiyse puan 0 ve açıklayıcı bir özet döner.
+ */
+export function scoreExcludingFlagged(questions: ExamQuestion[], graded: GradedAnswer[], flagged: number[]) {
+  const skip = new Set(flagged);
+  const qs = questions.filter((q) => !skip.has(q.id));
+  const gs = graded.filter((g) => !skip.has(g.question_id));
+  const topics = computeTopicStats(qs, gs);
+  if (!gs.length) {
+    return { score: 0, topics, feedback: "Tüm sorular hatalı olarak işaretlendi; bu sınav puanlanamadı." };
+  }
+  const score = overallScore(gs);
+  let feedback = buildFeedbackSummary(score, gs, topics);
+  if (skip.size) feedback += ` ${skip.size} soru hatalı olarak işaretlendiği için puana dahil edilmedi.`;
+  return { score, topics, feedback };
+}
