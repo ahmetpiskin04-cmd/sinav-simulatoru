@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sınav Simülatörü</title>
+<link rel="icon" href="icon-256.png">
+<style>
+  :root { --bg: #fafafa; --fg: #18181b; --muted: #71717a; --ring: #e4e4e7; --accent: #4f46e5; --err: #dc2626; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #09090b; --fg: #f4f4f5; --muted: #a1a1aa; --ring: #27272a; --accent: #818cf8; --err: #f87171; }
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg); color: var(--fg);
+    font-family: "Segoe UI", system-ui, sans-serif;
+    display: grid; place-items: center; text-align: center; padding: 16px;
+  }
+  img { width: 88px; height: 88px; border-radius: 22px; box-shadow: 0 12px 32px rgb(79 70 229 / .35); }
+  h1 { font-size: 22px; font-weight: 600; margin: 22px 0 6px; letter-spacing: -.01em; }
+  p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.5; max-width: 340px; }
+  .spinner {
+    width: 22px; height: 22px; margin: 26px auto 0; border-radius: 50%;
+    border: 2.5px solid var(--ring); border-top-color: var(--accent);
+    animation: spin .8s linear infinite;
+  }
+  .secs { margin-top: 10px; font-size: 12px; font-variant-numeric: tabular-nums; color: var(--muted); }
+  .error { color: var(--err); }
+  code { font-family: Consolas, monospace; font-size: 12.5px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 2.4s; } }
+</style>
+</head>
+<body>
+<main>
+  <img src="icon-256.png" alt="">
+  <h1>Sınav Simülatörü</h1>
+  <p id="msg">Açılıyor…</p>
+  <div class="spinner" id="spin" role="status" aria-label="Yükleniyor"></div>
+  <div class="secs" id="secs"></div>
+</main>
+<script>
+  // start.ps1 bu sayfayı ?port=3456&build=1 gibi parametrelerle açar
+  var q = new URLSearchParams(location.search);
+  var port = q.get("port") || "3456";
+  var building = q.get("build") === "1";
+  var target = "http://127.0.0.1:" + port + "/";
+  var started = Date.now();
+  var LIMIT_MS = (building ? 6 : 2) * 60 * 1000;
+
+  var msg = document.getElementById("msg");
+  var secs = document.getElementById("secs");
+  if (building) {
+    msg.textContent = "Uygulama hazırlanıyor. İlk açılışta ya da kod değiştikten sonra bu bir dakika kadar sürer.";
+  }
+
+  // Sunucu ayağa kalkınca simgesi yüklenir; yüklendiği an uygulamaya geç
+  function ping() {
+    var img = new Image();
+    img.onload = function () { location.replace(target); };
+    img.onerror = retry;
+    img.src = target + "favicon.ico?t=" + Date.now();
+  }
+  function retry() {
+    var elapsed = Date.now() - started;
+    secs.textContent = Math.floor(elapsed / 1000) + " sn";
+    if (elapsed > LIMIT_MS) {
+      document.getElementById("spin").remove();
+      secs.textContent = "";
+      msg.className = "error";
+      msg.innerHTML = "Uygulama başlatılamadı. Ayrıntılar proje klasöründeki <code>launcher\\server.log</code> dosyasında.";
+      return;
+    }
+    setTimeout(ping, 700);
+  }
+  ping();
+</script>
+</body>
+</html>
