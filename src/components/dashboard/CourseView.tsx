@@ -2,12 +2,15 @@
 
 import { useState, type ReactNode } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { ProgressChart } from "@/components/dashboard/ProgressChart";
 import {
   ChevronRight,
   ClipboardList,
   FileText,
   Layers,
   LoaderCircle,
+  MessageCircleQuestion,
   Presentation,
   RotateCcw,
   ScanEye,
@@ -43,6 +46,7 @@ export function CourseView({
   onDelete,
   onMaterialChange,
 }: Props) {
+  const router = useRouter();
   const { course, materials, exams, review, study_sets: studySets } = detail;
   const slides = materials.filter((m) => m.file_type === "slide");
   const pastExams = materials.filter((m) => m.file_type === "past_exam");
@@ -116,7 +120,21 @@ export function CourseView({
           disabled={review.total_wrong === 0 || !canCreateExam}
           tone="neutral"
         />
+        <ActionCard
+          icon={<MessageCircleQuestion className="size-5" />}
+          title="Derse Soru Sor"
+          description={
+            canCreateExam
+              ? "Slaytlarına dayanarak sorularını cevaplar, hangi dosyadan aldığını gösterir."
+              : "Önce metni okunabilen bir materyal yükle."
+          }
+          onClick={() => router.push(`/chat/${course.id}`)}
+          disabled={!canCreateExam}
+          tone="neutral"
+        />
       </section>
+
+      <ProgressChart exams={exams} />
 
       {/* Materyaller */}
       <section className="mb-10 grid gap-6 lg:grid-cols-2">

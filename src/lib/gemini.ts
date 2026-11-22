@@ -63,6 +63,10 @@ export const examModels = () => withNvidia(modelList(process.env.GEMINI_MODEL, D
 export const gradingModels = () => withNvidia(modelList(process.env.GEMINI_GRADING_MODEL, DEFAULT_GRADING_MODELS), "end");
 export const visionModels = () => modelList(process.env.GEMINI_VISION_MODEL, DEFAULT_VISION_MODELS);
 export const verifyModels = () => withNvidia(modelList(process.env.GEMINI_VERIFY_MODEL, DEFAULT_VERIFY_MODELS), "end");
+// Derse soru sor: çok mesaj atılabildiği için lite önce (güçlü modelin günlük kotası sınavlara kalsın).
+// Materyalden cevap bulma ve açıklama, lite modellerin iyi yaptığı bir iş. NVIDIA yok (generateText).
+const DEFAULT_CHAT_MODELS = [...LITE_GEMINI, ...STRONG_GEMINI];
+export const chatModels = () => modelList(process.env.GEMINI_CHAT_MODEL, DEFAULT_CHAT_MODELS);
 
 /**
  * NVIDIA varsayılan olarak zincirin EN SONUNDA: 15 soruluk ölçümde 1 yanlış anahtar + 1 hatalı +
