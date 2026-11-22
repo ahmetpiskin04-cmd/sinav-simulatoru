@@ -33,7 +33,11 @@ export class GeminiError extends Error {
 // - NVIDIA nemotron-3-ultra: yalnızca "düşünme" açıkken doğru, yavaş (80-120 sn); kalite lite düzeyinde. Mistral/super-vl matematik
 //   sembollerini içerik filtresine takıyor (422), kullanılamaz.
 // ---------------------------------------------------------------------------
-const STRONG_GEMINI = ["gemini-3.5-flash", "gemini-3.8-flash", "gemini-3.7-flash", "gemini-4-hydrogen"];
+// gemini-4-hydrogen en yeni model: 10 soruluk zor TOC sınavında 10/10 doğru anahtar (22 Kasım 2026) ama sık "aşırı
+// yoğun" (503). Bu yüzden zincirin başında ve sabırlı: 503'te 3-6-9 sn arayla 4 kez denenir, olmazsa 3.5-flash'a geçilir.
+const PATIENT_MODELS = ["gemini-4-hydrogen"];
+const PATIENT_ATTEMPTS = 4;
+const STRONG_GEMINI = ["gemini-4-hydrogen", "gemini-3.5-flash", "gemini-3.8-flash", "gemini-3.7-flash"];
 const LITE_GEMINI = ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite"];
 export const NVIDIA_PREFIX = "nvidia:";
 const NVIDIA_STRONG = `${NVIDIA_PREFIX}nvidia/nemotron-3-ultra-550b-a55b`;
@@ -41,7 +45,8 @@ const NVIDIA_STRONG = `${NVIDIA_PREFIX}nvidia/nemotron-3-ultra-550b-a55b`;
 const DEFAULT_EXAM_MODELS = [...STRONG_GEMINI, ...LITE_GEMINI];
 const DEFAULT_GRADING_MODELS = [...LITE_GEMINI, ...STRONG_GEMINI];
 // PDF görsel okuma: yalnızca Gemini (NVIDIA tarafında PDF girdisi yok)
-const DEFAULT_VISION_MODELS = [...STRONG_GEMINI, ...LITE_GEMINI];
+// (hydrogen PDF girdisiyle denenmedi, bu yüzden burada yok)
+const DEFAULT_VISION_MODELS = [...STRONG_GEMINI.filter((m) => !PATIENT_MODELS.includes(m)), ...LITE_GEMINI];
 // Cevap anahtarı doğrulaması. Tek başına "lite" çözücü tuzaklı ama doğru soruları yanlış çözüp
 // eliyordu (ölçüldü); bu yüzden uyuşmazlıklar hakeme gider (verify.ts). Hakemli akışta 3.1-flash-lite
 // hem kasıtlı testte hem gerçek bir sınavda yanlış anahtarı doğru yakaladı. Güçlü modellerin kıt
@@ -227,7 +232,11 @@ async function run<T>(opts: {
   let lastError: unknown;
 
   for (const [index, modelName] of opts.models.entries()) {
-    for (let attempt = 1; attempt <= 2; attempt++) {
+    // Sabırlı modeller (iyi ama sık yoğun) 503'te aralıkla birkaç kez denenir; diğer yedekler hemen geçilir
+    const patient = PATIENT_MODELS.includes(modelName);
+    const maxAttempts = patient ? PATIENT_ATTEMPTS : index === 0 ? 2 : 1;
+    let parseFailures = 0;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       let text: string;
       try {
         text = await opts.call(modelName);
@@ -240,8 +249,8 @@ async function run<T>(opts: {
           throw new GeminiError(friendlyMessage(err), status);
         }
         if (!status || status === 404 || status === 429) break;
-        if (index > 0) break; // yoğun yedek modeli bekleme
-        if (attempt < 2) await sleep(2_000);
+        if (attempt >= maxAttempts) break; // yoğun yedek modeli bekleme
+        await sleep(patient ? 3_000 * attempt : 2_000); // sabırlı modelde 3, 6, 9 sn
         continue;
       }
 
@@ -250,6 +259,7 @@ async function run<T>(opts: {
       } catch (err) {
         lastError = new InvalidOutputError(errMessage(err));
         console.warn(`[yz] ${modelName} deneme ${attempt}: geçersiz çıktı:`, errMessage(err));
+        if (++parseFailures >= 2) break; // bozuk çıktıyı en fazla iki kez dene
       }
     }
   }
