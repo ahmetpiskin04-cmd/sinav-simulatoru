@@ -38,7 +38,7 @@ Her şey bu bilgisayarda durur (Node 22.5+ ile gelen `node:sqlite`, ek paket yok
 - Yedek almak için uygulama kapalıyken `~/.sinav-simulatoru` klasörünü kopyalamak yeterli.
 
 Kasım 2026'ya kadar veriler Supabase'deydi; tek seferlik bir betikle aynı kimliklerle yerel depoya taşındı
-(betik git geçmişinde). Supabase'deki eski kopya dokunulmadan duruyor.
+ve doğrulandı. Supabase'deki eski kopya dokunulmadan duruyor.
 
 ## Yapay zekâ modelleri ve kota
 
