@@ -16,6 +16,10 @@ Google Gemini (ücretsiz katman) · NVIDIA build.nvidia.com (son yedek)
 - **Çalışma rehberi:** sınavdaki zayıf konular için hap özet, tuzaklar ve 5 flashcard (kaydedilir).
 - **Özet & Kartlar:** sınavsız; seçilen dosyalardan konu özetleri ve "bildim / bilemedim" kart destesi (ilerleme kaydedilir).
 - **Yanlışlarımı Tekrar Et:** önceki sınavlardaki yanlışlardan, aynı kavramları farklı açıdan soran mini sınav.
+- **Süreli sınav:** 15-90 dk seçilebilir; geri sayım, süre bitince otomatik teslim, soru başına yaklaşık süre. Başlangıç sunucuya yazılır (yenileme sayacı sıfırlamaz).
+- **Bu soru hatalı:** sonuç ekranında işaretlenen soru puana, konu analizine ve tekrar sınavına dahil edilmez; geri alınabilir.
+- **Derse soru sor:** materyallerden kaynak göstererek ([Dosya.pdf, s. N]) cevap veren sohbet (`/chat/[ders]`); kapsam dışı cevaplar işaretlenir.
+- **İlerleme grafiği:** ders panelinde sınav puanlarının zaman içindeki seyri.
 - Sınav, materyal ve çalışma setleri panelden ✕ ile silinebilir.
 
 ## Kurulum
@@ -63,7 +67,7 @@ model zinciri kullanır ve kullanılamayan / kotası dolan / aşırı yoğun mod
 - Doğrulama bir güvenlik ağıdır, garanti değil (zor bir döngü sayma sorusunda yanlış anahtarı kaçırdı).
 
 Zincirler `.env.local`'de virgülle ayrılmış listeyle değiştirilebilir: `GEMINI_MODEL`, `GEMINI_VERIFY_MODEL`,
-`GEMINI_GRADING_MODEL`, `GEMINI_VISION_MODEL` (`nvidia:` önekiyle NVIDIA modelleri de yazılabilir);
+`GEMINI_GRADING_MODEL`, `GEMINI_VISION_MODEL`, `GEMINI_CHAT_MODEL` (`nvidia:` önekiyle NVIDIA modelleri de yazılabilir);
 `NVIDIA_POSITION=beforeLite` NVIDIA'yı lite modellerin önüne alır.
 
 Modeller "LaTeX kullanma" talimatına rağmen LaTeX yazabiliyor; `src/lib/latex.ts` JSON'u ayrıştırmadan önce
@@ -120,5 +124,5 @@ src/lib/course-sources.ts              Seçilen materyallerin metnini yükler
 - [x] Aşama 3: görsel ağırlıklı PDF'ler için Gemini Vision, zayıf konulara çalışma rehberi + flashcard
 - [x] Slayt seçerek sınav, sınavsız özet + flashcard (bildim/bilemedim), yanlışlardan tekrar sınavı
 - [x] Cevap anahtarı doğrulaması, tekrar önleme, ücretsiz kota için model zincirleri + NVIDIA yedeği
-- [ ] Derse soru sor (sohbet), ilerleme grafiği, "bu soru hatalı" düğmesi
+- [x] Süreli sınav, "bu soru hatalı", derse soru sor, ilerleme grafiği
 - [x] Supabase'den yerel SQLite'a geçiş (duraklatma derdi yok, ağ gerekmez)
