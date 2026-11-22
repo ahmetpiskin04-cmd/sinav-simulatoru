@@ -1,18 +1,12 @@
 import { connection } from "next/server";
-import { getSupabaseAdmin } from "@/lib/supabase/server";
 import { handleRouteError, jsonError } from "@/lib/api";
-import type { Course } from "@/lib/types";
+import { createCourse, listCourses } from "@/lib/db/repo";
 
 // GET /api/courses — tüm dersler (en yeni üstte)
 export async function GET() {
   await connection(); // her istekte çalışsın, derlemede statikleşmesin
   try {
-    const { data, error } = await getSupabaseAdmin()
-      .from("courses")
-      .select("*")
-      .order("created_at", { ascending: false });
-    if (error) throw error;
-    return Response.json(data as Course[]);
+    return Response.json(listCourses());
   } catch (err) {
     return handleRouteError(err);
   }
@@ -25,14 +19,7 @@ export async function POST(request: Request) {
     const title = typeof body?.title === "string" ? body.title.trim() : "";
     if (!title) return jsonError(400, "Ders adı boş olamaz.", "BAD_REQUEST");
     if (title.length > 120) return jsonError(400, "Ders adı en fazla 120 karakter olabilir.", "BAD_REQUEST");
-
-    const { data, error } = await getSupabaseAdmin()
-      .from("courses")
-      .insert({ title })
-      .select("*")
-      .single();
-    if (error) throw error;
-    return Response.json(data as Course, { status: 201 });
+    return Response.json(createCourse(title), { status: 201 });
   } catch (err) {
     return handleRouteError(err);
   }

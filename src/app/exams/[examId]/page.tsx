@@ -38,8 +38,8 @@ async function ExamLoader({ params }: { params: PageProps<"/exams/[examId]">["pa
       <ErrorState
         text={
           /column|42703/.test(msg)
-            ? "Veritabanı şeması güncel değil. supabase/migrations/002_exam_fields.sql dosyasını Supabase SQL Editor'de çalıştırın."
-            : "Sınav yüklenirken bir hata oluştu. Supabase bağlantısını kontrol edin."
+            ? "Veritabanı şeması güncel değil. Uygulamayı yeniden başlatın."
+            : "Sınav yüklenirken bir hata oluştu. Ayrıntılar launcher\\server.err.log dosyasında."
         }
       />
     );

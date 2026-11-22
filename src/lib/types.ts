@@ -2,7 +2,7 @@ import type { ExamSettings, StudyGuide } from "@/lib/exam/types";
 import type { ReviewSummary } from "@/lib/exam/review";
 import type { StudySetSummary } from "@/lib/study/types";
 
-// Veritabanı satırlarının uygulama içindeki karşılıkları (supabase/schema.sql ile aynı tutun)
+// Veritabanı satırlarının uygulama içindeki karşılıkları (src/lib/db/index.ts şemasıyla aynı tutun)
 
 export type MaterialType = "slide" | "past_exam";
 /** 'text': PDF'in kendi metni, 'gemini_vision': sayfalar Gemini ile okundu */
@@ -10,7 +10,6 @@ export type ExtractionMethod = "text" | "gemini_vision";
 
 export interface Course {
   id: string;
-  user_id: string | null;
   title: string;
   created_at: string;
 }
@@ -29,10 +28,6 @@ export interface Material {
 
 /** Listelerde metnin tamamını taşımamak için kullanılan özet */
 export type MaterialSummary = Omit<Material, "extracted_text"> & { text_length: number };
-
-/** Supabase'den özet için seçilen sütunlar (extracted_text hariç) */
-export const MATERIAL_SUMMARY_COLUMNS =
-  "id, course_id, file_name, file_type, storage_path, page_count, extraction_method, created_at";
 
 export interface UploadMaterialResponse {
   material: MaterialSummary;
@@ -68,9 +63,7 @@ export interface CourseDetail {
 export interface ApiError {
   error: string;
   code?:
-    | "SUPABASE_NOT_CONFIGURED"
     | "GEMINI_NOT_CONFIGURED"
-    | "SCHEMA_OUTDATED"
     | "AI_ERROR"
     | "NOT_FOUND"
     | "BAD_REQUEST"

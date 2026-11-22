@@ -1,5 +1,5 @@
 import "server-only";
-import { getSupabaseAdmin } from "@/lib/supabase/server";
+import { listMaterials } from "@/lib/db/repo";
 import { isUuid } from "@/lib/api";
 import type { SourceMaterial } from "@/lib/exam/generate";
 
@@ -17,12 +17,7 @@ export interface LoadedSources {
  * onlar (bu derse ait olmayan ya da metinsiz olanlar sessizce elenir).
  */
 export async function loadCourseSources(courseId: string, materialIds?: string[]): Promise<LoadedSources> {
-  const { data, error } = await getSupabaseAdmin()
-    .from("materials")
-    .select("id, file_name, file_type, extracted_text")
-    .eq("course_id", courseId)
-    .order("created_at");
-  if (error) throw error;
+  const data = listMaterials(courseId, "old");
 
   const wanted = materialIds?.length ? new Set(materialIds) : null;
   const sources = data

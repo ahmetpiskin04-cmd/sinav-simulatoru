@@ -1,33 +1,12 @@
 import "server-only";
-import { getSupabaseAdmin } from "@/lib/supabase/server";
+import { getExam, type ExamRow } from "@/lib/db/repo";
 import { computeTopicStats } from "@/lib/exam/grade";
-import type { ExamQuestion, ExamSettings, ExamView, GradedAnswer, StudyGuide } from "@/lib/exam/types";
+import type { ExamView } from "@/lib/exam/types";
 
-export interface ExamRow {
-  id: string;
-  course_id: string;
-  title: string | null;
-  settings: ExamSettings | null;
-  questions_json: ExamQuestion[];
-  user_answers_json: GradedAnswer[] | null;
-  score: number | string | null;
-  feedback_summary: string | null;
-  submitted_at: string | null;
-  study_guide: StudyGuide | null;
-  created_at: string;
-  courses: { id: string; title: string } | null;
-}
+export type { ExamRow };
 
 export async function getExamRow(examId: string): Promise<ExamRow | null> {
-  const { data, error } = await getSupabaseAdmin()
-    .from("exams")
-    .select(
-      "id, course_id, title, settings, questions_json, user_answers_json, score, feedback_summary, submitted_at, study_guide, created_at, courses(id, title)",
-    )
-    .eq("id", examId)
-    .maybeSingle();
-  if (error) throw error;
-  return data as ExamRow | null;
+  return getExam(examId);
 }
 
 /**

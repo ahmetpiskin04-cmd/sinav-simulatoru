@@ -10,7 +10,7 @@ interface SidebarProps {
   selectedId: string | null;
   onSelect: (id: string) => void;
   onCreate: (title: string) => Promise<void>;
-  disabled?: boolean; // Supabase yapılandırılmamışsa
+  disabled?: boolean; // dersler yüklenemediyse
   onCloseMobile?: () => void;
 }
 

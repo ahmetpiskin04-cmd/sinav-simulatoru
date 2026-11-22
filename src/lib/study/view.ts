@@ -1,19 +1,9 @@
 import "server-only";
-import { getSupabaseAdmin } from "@/lib/supabase/server";
+import { getStudySet as getStudySetRow } from "@/lib/db/repo";
 import type { CardStatus, CardStatusMap, StudySet, StudySetSummary, StudySetView } from "@/lib/study/types";
 
-const COLUMNS = "id, course_id, title, source_names, content, card_status, model, created_at";
-
 export async function getStudySet(setId: string): Promise<StudySetView | null> {
-  const { data, error } = await getSupabaseAdmin()
-    .from("study_sets")
-    .select(`${COLUMNS}, courses(id, title)`)
-    .eq("id", setId)
-    .maybeSingle();
-  if (error) throw error;
-  if (!data) return null;
-  const { courses, ...set } = data as unknown as StudySet & { courses: { id: string; title: string } | null };
-  return { ...set, card_status: set.card_status ?? {}, course: courses ?? { id: set.course_id, title: "Ders" } };
+  return getStudySetRow(setId);
 }
 
 export function toSummary(set: Pick<StudySet, "id" | "title" | "created_at" | "source_names" | "content" | "card_status">): StudySetSummary {

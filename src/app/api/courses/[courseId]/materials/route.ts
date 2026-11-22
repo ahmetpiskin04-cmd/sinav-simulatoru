@@ -1,10 +1,10 @@
 import type { NextRequest } from "next/server";
-import { getSupabaseAdmin, MATERIALS_BUCKET } from "@/lib/supabase/server";
 import { handleRouteError, isUuid, jsonError } from "@/lib/api";
 import { extractMaterialText } from "@/lib/material-text";
-import { MATERIAL_SUMMARY_COLUMNS, type MaterialSummary, type MaterialType, type UploadMaterialResponse } from "@/lib/types";
-
+import { getCourse, insertMaterial, toMaterialSummary } from "@/lib/db/repo";
+import { deletePdf, savePdf } from "@/lib/db/files";
 import { MAX_PDF_BYTES, MAX_PDF_MB } from "@/lib/constants";
+import type { MaterialType, UploadMaterialResponse } from "@/lib/types";
 
 // Görsel ağırlıklı PDF'ler Gemini ile okunur; uzun sürebilir
 export const maxDuration = 300;
@@ -31,10 +31,7 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/courses
     const head = new TextDecoder().decode(new Uint8Array(bytes, 0, Math.min(5, bytes.byteLength)));
     if (head !== "%PDF-") return jsonError(400, "Yalnızca PDF dosyaları yüklenebilir.", "BAD_REQUEST");
 
-    const db = getSupabaseAdmin();
-    const { data: course, error: courseErr } = await db.from("courses").select("id").eq("id", courseId).maybeSingle();
-    if (courseErr) throw courseErr;
-    if (!course) return jsonError(404, "Ders bulunamadı.", "NOT_FOUND");
+    if (!getCourse(courseId)) return jsonError(404, "Ders bulunamadı.", "NOT_FOUND");
 
     let extracted;
     try {
@@ -43,15 +40,10 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/courses
       return jsonError(400, "PDF okunamadı. Dosya bozuk ya da şifreli olabilir.", "BAD_REQUEST");
     }
 
-    const storagePath = `${courseId}/${crypto.randomUUID()}.pdf`;
-    const { error: upErr } = await db.storage
-      .from(MATERIALS_BUCKET)
-      .upload(storagePath, bytes, { contentType: "application/pdf", upsert: false });
-    if (upErr) throw new Error(`Dosya depolamaya yüklenemedi: ${upErr.message}`);
-
-    const { data: row, error: insErr } = await db
-      .from("materials")
-      .insert({
+    const storagePath = savePdf(courseId, bytes);
+    let material;
+    try {
+      material = insertMaterial({
         course_id: courseId,
         file_name: file.name.slice(0, 255),
         file_type: fileType satisfies MaterialType,
@@ -59,17 +51,14 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/courses
         storage_path: storagePath,
         page_count: extracted.pageCount,
         extraction_method: extracted.method,
-      })
-      .select(MATERIAL_SUMMARY_COLUMNS)
-      .single();
-    if (insErr) {
-      await db.storage.from(MATERIALS_BUCKET).remove([storagePath]); // yetim dosya bırakma
-      throw insErr;
+      });
+    } catch (err) {
+      deletePdf(storagePath); // yetim dosya bırakma
+      throw err;
     }
 
-    const summary: MaterialSummary = { ...row, text_length: extracted.text.length };
     return Response.json(
-      { material: summary, notice: extracted.notice, warning: extracted.warning } satisfies UploadMaterialResponse,
+      { material: toMaterialSummary(material), notice: extracted.notice, warning: extracted.warning } satisfies UploadMaterialResponse,
       { status: 201 },
     );
   } catch (err) {

@@ -25,7 +25,6 @@ export function Dashboard() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
-  const notConfigured = loadError?.code === "SUPABASE_NOT_CONFIGURED";
 
   // Dersleri yükle (setState yalnızca istek bitince, geri çağrılarda)
   const loadCourses = useCallback(() => {
@@ -158,16 +157,12 @@ export function Dashboard() {
 
         <div className="flex-1 overflow-y-auto">
           {loadError ? (
-            notConfigured ? (
-              <SetupNotice message={loadError.message} onRetry={loadCourses} />
-            ) : (
-              <CenteredMessage
-                icon={<CircleAlert className="size-6 text-red-500" />}
-                title="Dersler yüklenemedi"
-                text={loadError.message}
-                action={<RetryButton onClick={loadCourses} />}
-              />
-            )
+            <CenteredMessage
+              icon={<CircleAlert className="size-6 text-red-500" />}
+              title="Dersler yüklenemedi"
+              text={loadError.message}
+              action={<RetryButton onClick={loadCourses} />}
+            />
           ) : courses === null || (selectedId && !detail && !detailError) ? (
             <div className="grid h-full place-items-center">
               <LoaderCircle className="size-6 animate-spin text-zinc-400" />
@@ -286,35 +281,5 @@ function RetryButton({ onClick }: { onClick: () => void }) {
       <RotateCw className="size-4" />
       Tekrar dene
     </button>
-  );
-}
-
-function SetupNotice({ message, onRetry }: { message: string; onRetry: () => void }) {
-  return (
-    <div className="mx-auto max-w-2xl px-6 py-12">
-      <div className="rounded-2xl border border-amber-300 bg-amber-50 p-6 dark:border-amber-500/30 dark:bg-amber-500/5">
-        <div className="mb-3 flex items-center gap-2 font-semibold text-amber-800 dark:text-amber-300">
-          <CircleAlert className="size-5" />
-          Supabase bağlantısı gerekiyor
-        </div>
-        <p className="mb-4 text-sm text-amber-900/80 dark:text-amber-200/80">{message}</p>
-        <ol className="list-decimal space-y-1.5 pl-5 text-sm text-zinc-700 dark:text-zinc-300">
-          <li>
-            Supabase&apos;de proje aç, <b>SQL Editor</b>&apos;e <code className="font-mono">supabase/schema.sql</code>{" "}
-            dosyasını yapıştırıp çalıştır.
-          </li>
-          <li>
-            <code className="font-mono">.env.example</code> dosyasını <code className="font-mono">.env.local</code> olarak
-            kopyala, URL ve service role anahtarını yaz.
-          </li>
-          <li>
-            Geliştirme sunucusunu yeniden başlat (<code className="font-mono">npm run dev</code>).
-          </li>
-        </ol>
-        <div className="mt-5">
-          <RetryButton onClick={onRetry} />
-        </div>
-      </div>
-    </div>
   );
 }

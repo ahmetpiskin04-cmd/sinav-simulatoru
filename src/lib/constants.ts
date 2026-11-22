@@ -1,5 +1,5 @@
 // Hem sunucu hem tarayıcı tarafında kullanılan sabitler
-export const MAX_PDF_MB = 25; // supabase/schema.sql'deki kova sınırıyla aynı tutun
+export const MAX_PDF_MB = 25;
 export const MAX_PDF_BYTES = MAX_PDF_MB * 1024 * 1024;
 
 export const MATERIAL_TYPE_LABELS = {

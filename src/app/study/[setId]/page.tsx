@@ -41,8 +41,8 @@ async function StudySetLoader({ params }: { params: PageProps<"/study/[setId]">[
           <h1 className="text-lg font-semibold">Çalışma seti açılamadı</h1>
           <p className="mt-1.5 text-sm text-zinc-500">
             {/42P01|PGRST205|42703/.test(code)
-              ? "Veritabanı şeması güncel değil. supabase/migrations/004_study_sets.sql dosyasını Supabase SQL Editor'de çalıştırın."
-              : "Yüklenirken bir hata oluştu. Supabase bağlantısını kontrol edin."}
+              ? "Veritabanı şeması güncel değil. Uygulamayı yeniden başlatın."
+              : "Yüklenirken bir hata oluştu. Ayrıntılar launcher\\server.err.log dosyasında."}
           </p>
           <Link href="/" className="mt-5 inline-block text-sm font-medium text-indigo-600 hover:underline dark:text-indigo-400">
             Panele dön
