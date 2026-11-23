@@ -133,3 +133,7 @@ src/lib/course-sources.ts              Seçilen materyallerin metnini yükler
 - [x] Cevap anahtarı doğrulaması, tekrar önleme, ücretsiz kota için model zincirleri + NVIDIA yedeği
 - [x] Süreli sınav, "bu soru hatalı", derse soru sor, ilerleme grafiği
 - [x] Supabase'den yerel SQLite'a geçiş (duraklatma derdi yok, ağ gerekmez)
+
+## Lisans
+
+MIT, bkz. [LICENSE](LICENSE).
