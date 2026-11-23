@@ -44,6 +44,13 @@ Her şey bu bilgisayarda durur (Node 22.5+ ile gelen `node:sqlite`, ek paket yok
 Kasım 2026'ya kadar veriler Supabase'deydi; tek seferlik bir betikle aynı kimliklerle yerel depoya taşındı
 ve doğrulandı. Supabase'deki eski kopya dokunulmadan duruyor.
 
+### Yedekleme
+
+Veritabanının günlük kopyası `~/OneDrive/sinav-simulatoru-yedek/data-YYYY-AA-GG.db` olarak alınır (uygulama açılırken ve
+açık kaldıkça 6 saatte bir kontrol edilir; son 7 gün tutulur; OneDrive yoksa `~/.sinav-simulatoru/yedek`). `BACKUP_DIR` ile
+değiştirilebilir. Geri yüklemek için uygulamayı kapatıp yedeği `~/.sinav-simulatoru/data.db` üzerine kopyalayın (varsa
+yanındaki `data.db-wal` ve `data.db-shm` dosyalarını silin). PDF'ler yedeklenmez: asıl dosyalar ders klasöründe, metinleri veritabanında.
+
 ## Yapay zekâ modelleri ve kota
 
 Ücretsiz katmanda çalışır (bilinçli tercih). Tüm çağrılar `src/lib/gemini.ts` üzerinden; her iş sıralı bir
@@ -51,7 +58,7 @@ model zinciri kullanır ve kullanılamayan / kotası dolan / aşırı yoğun mod
 
 | İş | Zincir (varsayılan) |
 |---|---|
-| Sınav, çalışma rehberi, özet & kartlar | 3.5-flash → 3.8-flash → 3.7-flash → 4-hydrogen → 3.5-flash-lite → 3.1-flash-lite → NVIDIA Nemotron Ultra |
+| Sınav, çalışma rehberi, özet & kartlar | 4-hydrogen (sabırlı: 503'te 4 deneme) → 3.5-flash → 3.8-flash → 3.7-flash → 3.5-flash-lite → 3.1-flash-lite → NVIDIA Nemotron Ultra |
 | Cevap anahtarı doğrulaması | 3.1-flash-lite → 3.5-flash-lite → güçlü Gemini'ler → NVIDIA |
 | Açık uçlu puanlama | lite'lar → güçlü Gemini'ler → NVIDIA |
 | PDF görsel okuma | güçlü Gemini'ler → lite'lar (NVIDIA'da PDF girdisi yok) |

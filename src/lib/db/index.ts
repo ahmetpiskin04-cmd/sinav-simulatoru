@@ -3,6 +3,7 @@ import { mkdirSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import { scheduleBackups } from "@/lib/db/backup";
 
 /**
  * Yerel veri deposu: tek bir SQLite dosyası + PDF klasörü.
@@ -87,6 +88,7 @@ export function getDb(): DatabaseSync {
   conn.exec("pragma journal_mode = wal; pragma foreign_keys = on; pragma busy_timeout = 5000;");
   migrate(conn);
   db = conn;
+  scheduleBackups(conn);
   return conn;
 }
 

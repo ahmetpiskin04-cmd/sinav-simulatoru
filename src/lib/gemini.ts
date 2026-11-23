@@ -71,7 +71,7 @@ export const verifyModels = () => withNvidia(modelList(process.env.GEMINI_VERIFY
 // Derse soru sor: çok mesaj atılabildiği için lite önce (güçlü modelin günlük kotası sınavlara kalsın).
 // Materyalden cevap bulma ve açıklama, lite modellerin iyi yaptığı bir iş. NVIDIA yok (generateText).
 const DEFAULT_CHAT_MODELS = [...LITE_GEMINI, ...STRONG_GEMINI];
-export const chatModels = () => modelList(process.env.GEMINI_CHAT_MODEL, DEFAULT_CHAT_MODELS);
+export const chatModels = () => withNvidia(modelList(process.env.GEMINI_CHAT_MODEL, DEFAULT_CHAT_MODELS), "end");
 
 /**
  * NVIDIA varsayılan olarak zincirin EN SONUNDA: 15 soruluk ölçümde 1 yanlış anahtar + 1 hatalı +
@@ -152,18 +152,23 @@ export function generateJson<T>(req: JsonRequest<T>): Promise<{ data: T; model: 
 
 /** Düz metin üretir; PDF gibi dosyaları da girdi olarak alabilir (yalnızca Gemini). */
 export function generateText<T>(req: TextRequest<T>): Promise<{ data: T; model: string }> {
+  // NVIDIA yalnızca düz metin girdide kullanılabilir (PDF gibi dosya parçaları gidemez)
+  const textOnly = req.parts.every((p) => "text" in p && typeof p.text === "string");
+  const plainPrompt = textOnly ? req.parts.map((p) => ("text" in p ? p.text : "")).join("\n\n") : "";
   return run({
-    models: req.models.filter((m) => !isNvidia(m)),
+    models: textOnly ? req.models : req.models.filter((m) => !isNvidia(m)),
     call: (model) =>
-      geminiCall(
-        {
-          model,
-          systemInstruction: req.systemInstruction,
-          generationConfig: { temperature: req.temperature ?? 0.2, maxOutputTokens: req.maxOutputTokens },
-        },
-        req.parts,
-        req.timeoutMs,
-      ),
+      isNvidia(model)
+        ? nvidiaChat(model, req.systemInstruction, plainPrompt, req.temperature ?? 0.2, Math.max(req.timeoutMs ?? 120_000, 240_000))
+        : geminiCall(
+            {
+              model,
+              systemInstruction: req.systemInstruction,
+              generationConfig: { temperature: req.temperature ?? 0.2, maxOutputTokens: req.maxOutputTokens },
+            },
+            req.parts,
+            req.timeoutMs,
+          ),
     parse: req.parse,
   });
 }

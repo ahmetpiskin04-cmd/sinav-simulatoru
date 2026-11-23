@@ -31,7 +31,7 @@ export function ProgressChart({ exams }: { exams: ExamSummary[] }) {
           </span>
         </p>
       </div>
-      <ul className="flex h-32 items-end gap-2" aria-label="Sınav puanları">
+      <ul className="flex h-32 items-end gap-2 border-b border-zinc-200 dark:border-zinc-700" aria-label="Sınav puanları">
         {done.map((e) => (
           <li key={e.id} className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-1" title={`${e.title ?? "Sınav"} · ${formatDate(e.created_at)} · %${Math.round(e.score!)}`}>
             <span className="text-[11px] font-medium text-zinc-600 tabular-nums dark:text-zinc-400">{Math.round(e.score!)}</span>
